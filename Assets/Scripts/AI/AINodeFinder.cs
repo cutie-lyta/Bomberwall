@@ -18,7 +18,7 @@ public class AINodeFinder : MonoBehaviour
     [SerializeField] private int _spacing;
     
     // Start is called before the first frame update
-    unsafe void Awake()
+    void Awake()
     {
         for (int x = _upleftCorner.x; x <= _downRightCorner.x; x += _spacing)
         {

@@ -5,27 +5,29 @@ using UnityEngine;
 public class AIBombPlacer : MonoBehaviour
 {
     public event Action<int> OnNewBomb;
-    public event Action OnBombPlaced;
-    private int _numOfBombs;
+    public event Action<int> OnBombPlaced;
+    public int BombCount { get; private set; }
 
     private void OnTriggerEnter(Collider other)
     {
+        print(GetType().FullName + "::OnTriggerEnter");
         if (other.CompareTag("BombContainer"))
         {
-            _numOfBombs++;
-            OnNewBomb?.Invoke(_numOfBombs);
+            BombCount++;
+            OnNewBomb?.Invoke(BombCount);
         }
-        else if (other.CompareTag("Respawn"))
-        {
-            for (int i = 0; i < _numOfBombs; i++)
-            {
-                var b = ObjectPoolManager.Instance.Pool<BombExplosion>();
-                b.transform.position = transform.position;
-            }
+    }
 
-            _numOfBombs = 0;
+    public void PlaceBomb()
+    {
+        print(GetType().FullName + "::PlaceBomb");
+        if (BombCount <= 0) return;
+        
+        var b = ObjectPoolManager.Instance.Pool<BombExplosion>();
+        b.transform.position = transform.position;
+
+        BombCount -= 1;
             
-            OnBombPlaced?.Invoke();
-        }
+        OnBombPlaced?.Invoke(BombCount);
     }
 }

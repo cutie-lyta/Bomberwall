@@ -5,35 +5,39 @@ using UnityEngine;
 public class PlayerBombCollector : MonoBehaviour
 {
     public event Action<int> OnBomb;
-    private int _numOfBombs;
+    public int NumOfBombs { get; private set; }
 
     private void Awake()
     {
+        print(GetType().FullName + "::Awake");
         PlayerMain.Instance.Register(this);
     }
 
     private void Start()
     {
+        print(GetType().FullName + "::Start");
         PlayerMain.Instance.Input.OnBomb += context =>
         {
+            print(GetType().FullName + "::Start::OnBombHandler");
             if(context.started){
-                if(_numOfBombs > 0){
+                if(NumOfBombs > 0){
                     var b = ObjectPoolManager.Instance.Pool<BombExplosion>();
                     b.transform.position = transform.position;
-                    _numOfBombs--;
+                    NumOfBombs--;
                 }
                 
-                OnBomb?.Invoke(_numOfBombs);
+                OnBomb?.Invoke(NumOfBombs);
             }
         };
     }
 
     private void OnTriggerEnter(Collider other)
     {
+        print(GetType().FullName + "::OnTriggerEnter");
         if (other.CompareTag("BombContainer"))
         {
-            _numOfBombs++;
-            OnBomb?.Invoke(_numOfBombs);
+            NumOfBombs++;
+            OnBomb?.Invoke(NumOfBombs);
         }
     }
     

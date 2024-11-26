@@ -1,9 +1,10 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
-public class ObjectPoolManager : MonoBehaviour
+public class ObjectPoolManager : SerializedMonoBehaviour
 {
     /// <summary>
     /// Singleton instance of this manager
@@ -14,27 +15,23 @@ public class ObjectPoolManager : MonoBehaviour
     /// A dictionnary containing the type of the IPoolable object and a max number of instance.
     /// It can accept non IPoolable class, but it will never get used,
     /// because the type check is used at instanciation and pooling
-    /// TODO: Use a TYPE variable with Odin.
-    /// TODO: Use normal dictionnary with Odin
     /// </summary>
     [Tooltip("The name of the type and the number max of instance of that type")]
-    [SerializeField] private SerializedDictionnary<string, int> _maxValue;
+    [SerializeField] private Dictionary<Type, int> _maxValue;
     
     /// <summary>
     /// A dictionnary containing the type of the IPoolable object and a prefab/gameobject to instanciate
     /// whenever there is not enough object in the pool and in existance.
     /// It can accept non IPoolable class, but it will never get used,
     /// because the type check is used at instanciation and pooling
-    /// TODO: Use a TYPE variable with Odin.
-    /// TODO: Use normal dictionnary with Odin
     /// </summary>
     [Tooltip("The name of the type and the prefab of that type")]
-    [SerializeField] private SerializedDictionnary<string, GameObject> _prefabPool;
+    [SerializeField] private Dictionary<Type, GameObject> _prefabPool;
     
     /// <summary>
-    /// The current number of each type in the pool actually (both instanciated and dormant)
+    /// The current of each type in the pool actually (both instanciated and dormant)
     /// </summary>
-    private Dictionary<Type, int> _currentPoolCount = new ();
+    private Dictionary<Type, List<IPoolable>> _currentPool = new ();
     
     /// <summary>
     /// A list of every dormant object in the pool
@@ -64,7 +61,7 @@ public class ObjectPoolManager : MonoBehaviour
     /// <returns> Whether the type T has a prefab attached or not </returns>
     public bool IsRegistered(Type T)
     {
-        return _prefabPool.Keys.Contains(T.Name);
+        return _prefabPool.ContainsKey(T);
     }
 
     /// <summary>
@@ -79,7 +76,14 @@ public class ObjectPoolManager : MonoBehaviour
     public void AddToPrefabPool(Type T, GameObject prefab)
     {
         prefab.transform.SetParent(transform);
-        _prefabPool.Add(T.Name, prefab);
+        _prefabPool.Add(T, prefab);
+    }
+
+    public void RegisterInstance<T>(IPoolable poolable) where T : MonoBehaviour, IPoolable
+    {
+        
+        if (!_currentPool.ContainsKey(typeof(T))) _currentPool.Add(typeof(T), new List<IPoolable>());
+        _currentPool[typeof(T)].Add(poolable);
     }
 
     /// <summary>
@@ -93,13 +97,15 @@ public class ObjectPoolManager : MonoBehaviour
         T pooledObject = (T)(_pool.Find(poolable => poolable.GetType() == typeof(T)));
         if (pooledObject == null)
         {
-            if (!_currentPoolCount.ContainsKey(typeof(T))) _currentPoolCount.Add(typeof(T), 0);
-            if (_currentPoolCount[typeof(T)] >= _maxValue[typeof(T).Name] ) return null;
-            
-            _currentPoolCount[typeof(T)]++;
-            
-            var prefab = _prefabPool[typeof(T).Name];
+            var prefab = _prefabPool[typeof(T)];
             var instance = Instantiate(prefab);
+
+            if (_currentPool[typeof(T)].Count >= _maxValue[typeof(T)])
+            {
+                Destroy(instance);
+                return null;
+            }
+
             pooledObject = instance.GetComponent<T>();
         }
         _pool.Remove(pooledObject);
@@ -118,6 +124,13 @@ public class ObjectPoolManager : MonoBehaviour
     public void Unpool(IPoolable pooledObject)
     {
         pooledObject.gameObject.SetActive(false);
+        
         _pool.Add(pooledObject);
+    }
+
+    public List<T> GetAllInstanceOf<T>() where T : MonoBehaviour, IPoolable
+    {
+        if (!_currentPool.ContainsKey(typeof(T))) return new();
+        return _currentPool[typeof(T)].Cast<T>().ToList();
     }
 }

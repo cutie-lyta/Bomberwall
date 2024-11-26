@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,29 +6,31 @@ public class AIBombUI : MonoBehaviour
 {
 	private AIBombPlacer _placer;
 
-	[SerializeField] private Image _slot1;
-	[SerializeField] private Image _slot2;
+	[SerializeField] private List<Image> _images;
 	
     private void Awake(){
+	    print(GetType().FullName + "::Awake");
 		_placer = GetComponent<AIBombPlacer>();
-		_placer.OnBombPlaced += () =>
-		{
-			_slot1.color = new Color32(0, 0, 0, 0);
-			_slot2.color = new Color32(0, 0, 0, 0);
-		};
+		
+		_placer.OnBombPlaced += DrawBombCounter;
+		_placer.OnNewBomb += DrawBombCounter;
+    }
 
-		_placer.OnNewBomb += i =>
-		{
-			if (i == 1)
-			{
-				_slot1.color = new Color32(0, 0, 0, 255);
-			}
-			else if (i == 2)
-			{
-				_slot1.color = new Color32(0, 0, 0, 255);
-				_slot2.color = new Color32(0, 0, 0, 255);
-			}
-		};
+    private void DrawBombCounter(int bomb)
+    {
+	    print(GetType().FullName + "::DrawBombCounter");
+	    int i = 0;
+	    for (; i < bomb; i++)
+	    {
+		    _images[i].gameObject.SetActive(true);
+		    _images[i].color = new Color(0f, 0f, 0f, 1f);
+	    }
+
+	    for (; i < _images.Count; i++)
+	    {
+		    _images[i].gameObject.SetActive(false);
+		    _images[i].color = new Color(0f, 0f, 0f, 0f);
+	    }
     }
     
     

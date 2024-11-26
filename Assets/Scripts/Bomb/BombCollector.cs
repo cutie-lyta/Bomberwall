@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class BombCollector : MonoBehaviour, IPoolable
 {
@@ -11,14 +13,21 @@ public class BombCollector : MonoBehaviour, IPoolable
     [SerializeField]
     private float _y;
 
-    [SerializeField] private int _spacing;    
-    
+    [SerializeField] private int _spacing;
+
+    private void Awake()
+    {
+        ObjectPoolManager.Instance.RegisterInstance<BombCollector>(this);
+    }
+
     private void Start()
     {
         OnPooled();
     }
-    
-    public void RegisterType() { }
+
+    public void RegisterType()
+    {
+    }
 
     private void OnTriggerEnter(Collider collision)
     {
@@ -36,5 +45,7 @@ public class BombCollector : MonoBehaviour, IPoolable
         transform.position = new Vector3(transform.position.x, _y, transform.position.z);
     }
 
-    public void OnUnPooled() { }
+    public void OnUnPooled()
+    {
+    }
 }

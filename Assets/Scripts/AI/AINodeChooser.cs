@@ -1,7 +1,10 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class AINodeChooser : MonoBehaviour
 {
@@ -12,34 +15,23 @@ public class AINodeChooser : MonoBehaviour
 
     private AIMovement _aiMove;
 
-    [SerializeField] private GameObject _wallToDestroy;
-    [SerializeField] private List<GameObject> _bombs;
-
     private Node _currentCible;
-
     private Coroutine _currentRoutine;
 
-    private Node _wallNode;
-
-    private GameObject _currentBomb;
-    
-    private bool _isBombSearching;
-    private bool _isGoingToWall = true;
+    private CancellationToken _cancelToken;
     
     private void Awake()
     {
         _aiMove = GetComponent<AIMovement>();
     }
 
-    private void Start()
+    public void CancelSequence()
     {
-        Vector3 pos = _wallToDestroy.transform.position;
-        pos.z -= 2f;
-            
-        _wallNode = FindClosestNode(pos);
+        _cancelToken = new CancellationToken();
+        _cancelToken.ThrowIfCancellationRequested();
     }
-
-    public void CreateSequence(Node finalNode)
+    
+    public Task CreateSequence(Node finalNode)
     {
         if(_currentRoutine != null) StopCoroutine(_currentRoutine);
 
@@ -54,93 +46,31 @@ public class AINodeChooser : MonoBehaviour
         _activeList[0].G = 0;
             
         _currentCible = finalNode;
+
+        int i = 0;
+
+        while (_activeList[^1] != _currentCible) {
+            if (_cancelToken.IsCancellationRequested)
+            {
+                break;
+            }
             
-        while (_activeList[^1] != finalNode) {
             AddClosestNeighbourToList();
             SelectActiveList();
+
+            i++;
+            if (i > 133)
+            {
+                print("Failed on : " + Nodes.IndexOf(_activeList[0]) + " to " + Nodes.IndexOf(finalNode));
+                print("List is : " + String.Join(", ", _activeList.ConvertAll(n => Nodes.IndexOf(n).ToString())));
+                break;
+            }
         }
+        
+        _currentRoutine = StartCoroutine(_aiMove.ExecuteSequence(_activeList));
+        return Task.CompletedTask;
     }
-
-    public void OnTriggerEnter(Collider other)
-    {
-        if (other.CompareTag("BombContainer"))
-        {
-            _isGoingToWall = true;
-            Vector3 pos = _wallToDestroy.transform.position;
-            pos.z -= 2f;
-            
-            Node wallNode = FindClosestNode(pos);
-
-            _currentBomb = null;
-            CreateSequence(wallNode);
-            _currentRoutine = StartCoroutine(_aiMove.ExecuteSequence(_activeList));
-        }
-
-        if (other.CompareTag("Respawn") && _isGoingToWall)
-        {
-            _isGoingToWall = false;
-            
-            Node bombNode = null;
-            foreach (GameObject g in _bombs)
-            {
-                if (g.activeInHierarchy != true) continue;
-                var n = FindClosestNode(g.transform.position);
-                
-                if (bombNode == null || 
-                    Vector3.Distance(n.Position, FindClosestNode(transform.position).Position) < Vector3.Distance(bombNode.Position, FindClosestNode(transform.position).Position) )
-                {
-                    bombNode = n;
-                    _currentBomb = g;
-                }
-            }
-            
-            if (bombNode == null)
-            {
-                _isBombSearching = true;
-                return;
-            }
     
-            CreateSequence(bombNode);
-            _currentRoutine = StartCoroutine(_aiMove.ExecuteSequence(_activeList));
-        }
-    }
-
-    private void FixedUpdate()
-    {
-        if (_isBombSearching)
-        {
-            _isBombSearching = false;
-            Node bombNode = null;
-            foreach (GameObject g in _bombs)
-            {
-                if (g.activeInHierarchy != true) continue;
-                var n = FindClosestNode(g.transform.position);
-                
-                if (bombNode == null || 
-                    Vector3.Distance(n.Position, FindClosestNode(transform.position).Position) < Vector3.Distance(bombNode.Position, FindClosestNode(transform.position).Position) )
-                {
-                    bombNode = n;
-                    _currentBomb = g;
-                }
-            }
-            
-            if (bombNode == null)
-            {
-                _isBombSearching = true;
-                return;
-            }
-    
-            CreateSequence(bombNode);
-            _currentRoutine = StartCoroutine(_aiMove.ExecuteSequence(_activeList));
-        }
-
-        if (_currentBomb && !_currentBomb.activeInHierarchy)
-        {
-            _currentBomb = null;
-            _isBombSearching = true;
-        }
-    }
-
     public void SelectActiveList()
     {
         List<Node> minList = _activeList;
@@ -160,7 +90,7 @@ public class AINodeChooser : MonoBehaviour
     public void AddClosestNeighbourToList()
     {
         var node = _activeList[^1];
-
+        
         List<Node> minNodes = new List<Node>() { node.Connected[0] };
             
         foreach(Node neighbour in node.Connected){
@@ -187,13 +117,28 @@ public class AINodeChooser : MonoBehaviour
         _activeList.Add(minNodes[0]);
     }
     
-    private Node FindClosestNode(Vector3 position)
+    public Node FindClosestNode(Vector3 position)
     {
         Node n = Nodes[0];
 
         foreach (Node node in Nodes)
         {
             if ((position - node.Position).magnitude < (position - n.Position).magnitude)
+            {
+                n = node;
+            }
+        }
+        
+        return n;
+    }
+
+    public Node FindFarthestNode(Vector3 position)
+    {
+        Node n = Nodes[0];
+
+        foreach (Node node in Nodes)
+        {
+            if ((position - node.Position).magnitude > (position - n.Position).magnitude)
             {
                 n = node;
             }
