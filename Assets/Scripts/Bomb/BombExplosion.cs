@@ -33,9 +33,13 @@ public class BombExplosion : MonoBehaviour, IPoolable
         List<RaycastHit> hits = Physics.RaycastAll(transform.position, Vector3.forward * 3f).ToList();
         hits.AddRange(Physics.RaycastAll(transform.position, Vector3.back * 3f)); 
         hits.AddRange(Physics.RaycastAll(transform.position, Vector3.left * 3f)); 
-        hits.AddRange(Physics.RaycastAll(transform.position, Vector3.right * 3f)); 
-        
-        for (int i = 0; i < hits.Count; i++) { }
+        hits.AddRange(Physics.RaycastAll(transform.position, Vector3.right * 3f));
+
+        for (int i = 0; i < hits.Count; i++)
+        {
+            if (hits[i].transform.CompareTag("Wall")) continue;
+            hits[i].transform.SendMessage("Exploded", SendMessageOptions.DontRequireReceiver);
+        }
         
         ObjectPoolManager.Instance.Unpool(this);
         ObjectPoolManager.Instance.Pool<BombCollector>();
